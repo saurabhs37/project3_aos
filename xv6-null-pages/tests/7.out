@@ -1,1 +1,0 @@
-XV6_TEST_OUTPUT: Return value of mprotect on Page where MAIN is mapped: 0

@@ -1,3 +1,0 @@
-testing bad arguments for mprotect system call
-    * len <=0
-    * address not in page range (PGSIZE)
