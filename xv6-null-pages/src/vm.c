@@ -322,12 +322,14 @@ copyuvm(pde_t *pgdir, uint sz)
 
   if((d = setupkvm()) == 0)
     return 0;
-  for(i = 0; i < sz; i += PGSIZE){
+  // Saurabh, Code is starting from 0x1000
+  for(i = 0x1000; i < sz; i += PGSIZE){
     if((pte = walkpgdir(pgdir, (void *) i, 0)) == 0)
       panic("copyuvm: pte should exist");
     if(!(*pte & PTE_P))
       panic("copyuvm: page not present");
     pa = PTE_ADDR(*pte);
+// Saurabh, We are already copying old flag to new table.
     flags = PTE_FLAGS(*pte);
     if((mem = kalloc()) == 0)
       goto bad;
@@ -383,6 +385,144 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
     va = va0 + PGSIZE;
   }
   return 0;
+}
+
+/*
+static int setpteflag(void *addr, int len, int flag)
+{  
+  //struct cpu *c = mycpu();
+  //struct proc *p = c->proc;
+  struct proc *p = myproc();
+  uint i;
+  pte_t *pte;
+  char* a ;
+  pte_t *pgdir;
+  // check if Address is paged alligned
+  // PGSIZE = 4096 = 1 0000 0000 0000 (2^12)
+  // PGSIZE-1 = 0 1111 1111 1111 
+  // ~(PGSIZE-1) = 1111 ....1 0000 0000 0000
+  // for page alligned address last 12 bits should be 0 
+  if (((uint)addr & (PGSIZE-1)) != 0)
+  {
+    return -1;
+  }
+
+  if (len <= 0)
+    return -1;
+
+  if (p && p->pgdir)
+  {
+    pgdir = p->pgdir;
+    a = (char*) PGROUNDDOWN((uint)addr);
+    for (i = 0; i < len; i++)
+    {
+      pte = walkpgdir(pgdir, a, 0);
+      if (pte != 0 && (*pte & PTE_P))
+      {
+        (*pte) = (*pte) & (flag);
+      } 
+      else 
+      {
+        return -1;
+      }
+      a += PGSIZE;
+    }
+    lcr3(V2P(p->pgdir));
+    return 0;
+  }
+  return -1;
+}
+*/
+int mprotect(void *addr, int len)
+{
+  //return setpteflag(addr, len, (~PTE_W));
+  //struct cpu *c = mycpu();
+  //struct proc *p = c->proc;
+  struct proc *p = myproc();
+  uint i;
+  pte_t *pte;
+  char* a ;
+  pte_t *pgdir;
+  // check if Address is paged alligned
+  // PGSIZE = 4096 = 1 0000 0000 0000 (2^12)
+  // PGSIZE-1 = 0 1111 1111 1111 
+  // ~(PGSIZE-1) = 1111 ....1 0000 0000 0000
+  // for page alligned address last 12 bits should be 0 
+  if (((uint)addr & (PGSIZE-1)) != 0)
+  {
+    return -1;
+  }
+
+  if (len <= 0)
+    return -1;
+
+  if (p && p->pgdir)
+  {
+    pgdir = p->pgdir;
+    a = (char*) PGROUNDDOWN((uint)addr);
+    for (i = 0; i < len; i++)
+    {
+      pte = walkpgdir(pgdir, a, 0);
+      if (pte != 0 && (*pte & PTE_P))
+      {
+        (*pte) = (*pte) & (~PTE_W);
+      } 
+      else 
+      {
+        return -1;
+      }
+      a += PGSIZE;
+    }
+    lcr3(V2P(p->pgdir));
+    return 0;
+  }
+  return -1;
+}
+
+int munprotect(void *addr, int len)
+{
+  //return setpteflag(addr, len, (PTE_W));
+  //struct cpu *c = mycpu();
+  //struct proc *p = c->proc;
+  struct proc *p = myproc();
+  uint i;
+  pte_t *pte;
+  char* a ;
+  pte_t *pgdir;
+  // check if Address is paged alligned
+  // PGSIZE = 4096 = 1 0000 0000 0000 (2^12)
+  // PGSIZE-1 = 0 1111 1111 1111 
+  // ~(PGSIZE-1) = 1111 ....1 0000 0000 0000
+  // for page alligned address last 12 bits should be 0 
+  if (((uint)addr & (PGSIZE-1)) != 0)
+  {
+    return -1;
+  }
+
+  if (len <= 0)
+    return -1;
+
+  if (p && p->pgdir)
+  {
+    pgdir = p->pgdir;
+    a = (char*) PGROUNDDOWN((uint)addr);
+    for (i = 0; i < len; i++)
+    {
+      pte = walkpgdir(pgdir, a, 0);
+      if (pte != 0 && (*pte & PTE_P))
+      {
+        (*pte) = (*pte) | (PTE_W);
+      } 
+      else 
+      {
+        return -1;
+      }
+      a += PGSIZE;
+    }
+    lcr3(V2P(p->pgdir));
+    return 0;
+  }
+  return -1;
 }
 
 //PAGEBREAK!

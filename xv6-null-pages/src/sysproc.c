@@ -7,6 +7,9 @@
 #include "mmu.h"
 #include "proc.h"
 
+extern int  mprotect(void*, int);
+extern int munprotect(void*, int);
+
 int
 sys_fork(void)
 {
@@ -88,4 +91,28 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+int sys_mprotect(void)
+{
+  char* addr = 0;
+  int len = 0;
+  if (argptr(0, &addr, sizeof(char*)) < 0)
+    return -1;
+
+  if(argint(1, &len) < 0)
+    return -1;
+  return mprotect((void*)addr, len);
+}
+
+int sys_munprotect(void)
+{
+  char* addr = 0;
+  int len = 0;
+  if (argptr(0, (void*) &addr, sizeof(char*)) < 0)
+    return -1;
+
+  if(argint(1, &len) < 0)
+    return -1;
+  return munprotect((void*)addr, len);
 }
