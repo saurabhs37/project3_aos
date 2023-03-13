@@ -160,6 +160,7 @@ growproc(int n)
 {
   uint sz;
   struct proc *curproc = myproc();
+  struct proc *p, *parent;
 
   sz = curproc->sz;
   if(n > 0){
@@ -170,6 +171,27 @@ growproc(int n)
       return -1;
   }
   curproc->sz = sz;
+
+  // Check if any child thread (or current thrread is child thread) is there and we need to set sz variable for that
+  acquire(&ptable.lock);
+  if (curproc->parent != 0) 
+  {
+    parent = curproc->parent;
+    parent->sz = curproc->sz;
+  }
+  else 
+  {
+    parent = curproc;
+  }
+  for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+  {
+    if (p->parent == parent && (p->state != ZOMBIE || p->state != UNUSED)) 
+    {
+      p->sz = parent->sz;
+    }
+  }
+  release(&ptable.lock);
+
   switchuvm(curproc);
   return 0;
 }
@@ -226,19 +248,29 @@ int clone(void (*fnc)(void*, void*), void* arg1, void* arg2, void* stack)
   int i, pid;
   struct proc *np;
   struct proc *curproc = myproc();
+  int* usrStack = (int*) stack;
+  char* ustack = (char*)stack;
 
   // Allocate process.
   if((np = allocproc()) == 0){
     return -1;
   }
 
-  // Copy process state from proc.
-  /*if((np->pgdir = copyuvm(curproc->pgdir, curproc->sz)) == 0){
-    kfree(np->kstack);
-    np->kstack = 0;
-    np->state = UNUSED;
-    return -1;
-  }*/
+  // Stack population
+  // Put dummy PC on stack
+  //usrStack[0] = 0xFFFFFFFF;
+  //usrStack[1] = (uint)arg1;
+  //usrStack[2] = (uint)arg2;
+  //usrStack[0] = (uint)arg2;
+  //usrStack[1] = (uint)arg1;
+  //usrStack[2] = 0xFFFFFFFF;
+
+  // Assuming user stack size of 4096 = 4096/4 = 1024 int
+  usrStack[1023] = (uint)arg2;
+  usrStack[1022] = (uint)arg1;
+  usrStack[1021] = 0xFFFFFFFF;
+  ustack = ustack + 4096 - 12;
+
   np->pgdir = curproc->pgdir; // share same pgdir
   np->sz = curproc->sz;
   np->parent = curproc;
@@ -247,10 +279,6 @@ int clone(void (*fnc)(void*, void*), void* arg1, void* arg2, void* stack)
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
 
-  /*for(i = 0; i < NOFILE; i++)
-    if(curproc->ofile[i])
-      np->ofile[i] = filedup(curproc->ofile[i]);
-  */
   for(i = 0; i < NOFILE; i++)
     if(curproc->ofile[i])
       np->ofile[i] = curproc->ofile[i]; // Copy same ptr
@@ -263,7 +291,9 @@ int clone(void (*fnc)(void*, void*), void* arg1, void* arg2, void* stack)
   pid = np->pid; // it should be thread id
 
   np->tf->eip = (uint)fnc;
-  np->tf->esp = (uint)stack;
+  //np->tf->esp = (uint)stack;
+  np->tf->esp = (uint)ustack;
+  np->ustack = (char*)stack;
   acquire(&ptable.lock);
 
   np->state = RUNNABLE;
@@ -361,6 +391,47 @@ wait(void)
     // Wait for children to exit.  (See wakeup1 call in proc_exit.)
     sleep(curproc, &ptable.lock);  //DOC: wait-sleep
   }
+}
+
+int join(void** stack)
+{
+  struct proc *p;
+  int pid, havekids;
+  struct proc *curproc = myproc();
+  acquire(&ptable.lock);
+  for(;;) 
+  {
+    havekids = 0;
+    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+    {
+      if(p->parent != curproc)
+        continue;
+      havekids = 1;
+      if (p->state == ZOMBIE) 
+      {
+        pid = p->pid;
+        kfree(p->kstack);
+        p->kstack = 0;
+        p->pid = 0;
+        p->parent = 0;
+        p->name[0] = 0;
+        p->killed = 0;
+        p->state = UNUSED;
+        *stack = p->ustack;
+        release(&ptable.lock);
+        return pid;
+      }
+
+      if (!havekids || curproc->killed)
+      {
+        release(&ptable.lock);
+        return -1;
+      }
+      // Wait for children to exit.  (See wakeup1 call in proc_exit.)
+      sleep(curproc, &ptable.lock);  //DOC: wait-sleep
+    }
+  }
+  return -1;
 }
 
 //PAGEBREAK: 42
