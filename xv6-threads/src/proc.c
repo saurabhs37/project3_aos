@@ -160,7 +160,7 @@ growproc(int n)
 {
   uint sz;
   struct proc *curproc = myproc();
-  struct proc *p, *parent;
+  //struct proc *p, *parent;
 
   sz = curproc->sz;
   if(n > 0){
@@ -172,6 +172,7 @@ growproc(int n)
   }
   curproc->sz = sz;
 
+  /*
   // Check if any child thread (or current thrread is child thread) is there and we need to set sz variable for that
   acquire(&ptable.lock);
   if (curproc->parent != 0) 
@@ -191,6 +192,7 @@ growproc(int n)
     }
   }
   release(&ptable.lock);
+  */
 
   switchuvm(curproc);
   return 0;
@@ -256,6 +258,8 @@ int clone(void (*fnc)(void*, void*), void* arg1, void* arg2, void* stack)
     return -1;
   }
 
+  if (stack == 0) 
+    return -1;
   // Stack population
   // Put dummy PC on stack
   //usrStack[0] = 0xFFFFFFFF;
@@ -281,7 +285,7 @@ int clone(void (*fnc)(void*, void*), void* arg1, void* arg2, void* stack)
 
   for(i = 0; i < NOFILE; i++)
     if(curproc->ofile[i])
-      np->ofile[i] = curproc->ofile[i]; // Copy same ptr
+      np->ofile[i] = filedup(curproc->ofile[i]); // Copy same ptr
 
   //np->cwd = idup(curproc->cwd);
   np->cwd = curproc->cwd; // can share inode
@@ -422,6 +426,7 @@ int join(void** stack)
         return pid;
       }
 
+    }
       if (!havekids || curproc->killed)
       {
         release(&ptable.lock);
@@ -429,7 +434,6 @@ int join(void** stack)
       }
       // Wait for children to exit.  (See wakeup1 call in proc_exit.)
       sleep(curproc, &ptable.lock);  //DOC: wait-sleep
-    }
   }
   return -1;
 }

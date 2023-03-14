@@ -104,3 +104,45 @@ memmove(void *vdst, const void *vsrc, int n)
     *dst++ = *src++;
   return vdst;
 }
+
+int thread_create(void (*start_routine)(void *, void *), void *arg1, void *arg2)
+{
+  //void *stack = sbrk(4096);
+  void *stack = malloc(4096);
+  if (stack) {
+    memset(stack, 0, 4096);
+    return clone(start_routine, arg1, arg2, stack);
+  }
+  return -1;
+}
+
+int thread_join()
+{
+  void *stack = 0;
+  int pid = -1;
+  pid = join(&stack);
+  if (pid != -1 && stack != 0)
+  {
+    free(stack);
+    //sbrk(-4096);
+  }
+  return pid;
+}
+
+void lock_acquire(lock_t* lock)
+{
+  int myturn = xadd(&(lock->ticket), 1);
+  //printf(1, "myturn = %d lock->trun = %d\n", myturn, lock->turn);
+  while(lock->turn != myturn); 
+}
+
+void lock_release(lock_t* lock) 
+{
+  lock->turn = lock->turn + 1;
+}
+
+void lock_init(lock_t* lock)
+{
+  lock->ticket = 0;
+  lock->turn = 0;
+}
