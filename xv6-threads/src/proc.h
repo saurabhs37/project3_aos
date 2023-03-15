@@ -42,6 +42,7 @@ struct proc {
   char *ustack;                // for child thread created by clone
   enum procstate state;        // Process state
   int pid;                     // Process ID
+  int isChildThread;           // 1 if proc is child thread, 0 if not
   struct proc *parent;         // Parent process
   struct trapframe *tf;        // Trap frame for current syscall
   struct context *context;     // swtch() here to run process
@@ -57,3 +58,4 @@ struct proc {
 //   original data and bss
 //   fixed-size stack
 //   expandable heap
+#define USR_STACK_SIZE 4096

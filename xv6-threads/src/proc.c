@@ -88,6 +88,7 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
+  p->isChildThread = 0;
 
   release(&ptable.lock);
 
@@ -160,7 +161,6 @@ growproc(int n)
 {
   uint sz;
   struct proc *curproc = myproc();
-  //struct proc *p, *parent;
 
   sz = curproc->sz;
   if(n > 0){
@@ -172,28 +172,24 @@ growproc(int n)
   }
   curproc->sz = sz;
 
-  /*
-  // Check if any child thread (or current thrread is child thread) is there and we need to set sz variable for that
+  // Check if this is child thread and we need to update sz of parent thread
   acquire(&ptable.lock);
-  if (curproc->parent != 0) 
+  if (curproc->isChildThread == 1) 
   {
-    parent = curproc->parent;
-    parent->sz = curproc->sz;
+    curproc->parent->sz = sz;
   }
-  else 
+  /*else 
   {
-    parent = curproc;
-  }
-  for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-  {
-    if (p->parent == parent && (p->state != ZOMBIE || p->state != UNUSED)) 
+    // need to update sz for child thread?  Not clear in specifications
+    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
     {
-      p->sz = parent->sz;
+      if (p->parent == curproc && (p->state != ZOMBIE || p->state != UNUSED)) 
+      {
+        p->sz = parent->sz;
+      }
     }
-  }
+  }*/
   release(&ptable.lock);
-  */
-
   switchuvm(curproc);
   return 0;
 }
@@ -252,6 +248,7 @@ int clone(void (*fnc)(void*, void*), void* arg1, void* arg2, void* stack)
   struct proc *curproc = myproc();
   int* usrStack = (int*) stack;
   char* ustack = (char*)stack;
+  int stackEndIndex = USR_STACK_SIZE / sizeof(int);
 
   // Allocate process.
   if((np = allocproc()) == 0){
@@ -260,25 +257,17 @@ int clone(void (*fnc)(void*, void*), void* arg1, void* arg2, void* stack)
 
   if (stack == 0) 
     return -1;
-  // Stack population
-  // Put dummy PC on stack
-  //usrStack[0] = 0xFFFFFFFF;
-  //usrStack[1] = (uint)arg1;
-  //usrStack[2] = (uint)arg2;
-  //usrStack[0] = (uint)arg2;
-  //usrStack[1] = (uint)arg1;
-  //usrStack[2] = 0xFFFFFFFF;
-
-  // Assuming user stack size of 4096 = 4096/4 = 1024 int
-  usrStack[1023] = (uint)arg2;
-  usrStack[1022] = (uint)arg1;
-  usrStack[1021] = 0xFFFFFFFF;
-  ustack = ustack + 4096 - 12;
+  
+  usrStack[stackEndIndex-1] = (uint)arg2;
+  usrStack[stackEndIndex-2] = (uint)arg1;
+  usrStack[stackEndIndex-3] = 0xFFFFFFFF;
+  ustack = ustack + (USR_STACK_SIZE - 3 * sizeof(int));
 
   np->pgdir = curproc->pgdir; // share same pgdir
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
+  np->isChildThread = 1;
 
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
@@ -287,15 +276,13 @@ int clone(void (*fnc)(void*, void*), void* arg1, void* arg2, void* stack)
     if(curproc->ofile[i])
       np->ofile[i] = filedup(curproc->ofile[i]); // Copy same ptr
 
-  //np->cwd = idup(curproc->cwd);
-  np->cwd = curproc->cwd; // can share inode
+  np->cwd = idup(curproc->cwd);
 
   safestrcpy(np->name, curproc->name, sizeof(curproc->name));
 
   pid = np->pid; // it should be thread id
 
   np->tf->eip = (uint)fnc;
-  //np->tf->esp = (uint)stack;
   np->tf->esp = (uint)ustack;
   np->ustack = (char*)stack;
   acquire(&ptable.lock);

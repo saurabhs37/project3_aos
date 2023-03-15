@@ -132,8 +132,7 @@ int thread_join()
 void lock_acquire(lock_t* lock)
 {
   int myturn = xadd(&(lock->ticket), 1);
-  //printf(1, "myturn = %d lock->trun = %d\n", myturn, lock->turn);
-  while(lock->turn != myturn); 
+  while(lock->turn != myturn); // wait for lock 
 }
 
 void lock_release(lock_t* lock) 
