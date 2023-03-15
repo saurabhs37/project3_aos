@@ -387,66 +387,18 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
   return 0;
 }
 
-/*
-static int setpteflag(void *addr, int len, int flag)
-{  
-  //struct cpu *c = mycpu();
-  //struct proc *p = c->proc;
-  struct proc *p = myproc();
-  uint i;
-  pte_t *pte;
-  char* a ;
-  pte_t *pgdir;
-  // check if Address is paged alligned
-  // PGSIZE = 4096 = 1 0000 0000 0000 (2^12)
-  // PGSIZE-1 = 0 1111 1111 1111 
-  // ~(PGSIZE-1) = 1111 ....1 0000 0000 0000
-  // for page alligned address last 12 bits should be 0 
-  if (((uint)addr & (PGSIZE-1)) != 0)
-  {
-    return -1;
-  }
-
-  if (len <= 0)
-    return -1;
-
-  if (p && p->pgdir)
-  {
-    pgdir = p->pgdir;
-    a = (char*) PGROUNDDOWN((uint)addr);
-    for (i = 0; i < len; i++)
-    {
-      pte = walkpgdir(pgdir, a, 0);
-      if (pte != 0 && (*pte & PTE_P))
-      {
-        (*pte) = (*pte) & (flag);
-      } 
-      else 
-      {
-        return -1;
-      }
-      a += PGSIZE;
-    }
-    lcr3(V2P(p->pgdir));
-    return 0;
-  }
-  return -1;
-}
-*/
 int mprotect(void *addr, int len)
 {
-  //return setpteflag(addr, len, (~PTE_W));
-  //struct cpu *c = mycpu();
-  //struct proc *p = c->proc;
-  struct proc *p = myproc();
+  struct proc *p;
   uint i;
   pte_t *pte;
   char* a ;
   pte_t *pgdir;
+
+  p = myproc();
   // check if Address is paged alligned
   // PGSIZE = 4096 = 1 0000 0000 0000 (2^12)
   // PGSIZE-1 = 0 1111 1111 1111 
-  // ~(PGSIZE-1) = 1111 ....1 0000 0000 0000
   // for page alligned address last 12 bits should be 0 
   if (((uint)addr & (PGSIZE-1)) != 0)
   {
@@ -466,6 +418,7 @@ int mprotect(void *addr, int len)
       if (pte != 0 && (*pte & PTE_P))
       {
         (*pte) = (*pte) & (~PTE_W);
+        //filewrite(p->ofile[1], "check\n", 6);
       } 
       else 
       {
@@ -473,6 +426,7 @@ int mprotect(void *addr, int len)
       }
       a += PGSIZE;
     }
+    // This will trigger the cr3 register update
     lcr3(V2P(p->pgdir));
     return 0;
   }
@@ -481,18 +435,16 @@ int mprotect(void *addr, int len)
 
 int munprotect(void *addr, int len)
 {
-  //return setpteflag(addr, len, (PTE_W));
-  //struct cpu *c = mycpu();
-  //struct proc *p = c->proc;
-  struct proc *p = myproc();
+  struct proc *p;
   uint i;
   pte_t *pte;
   char* a ;
   pte_t *pgdir;
+
+  p = myproc();
   // check if Address is paged alligned
   // PGSIZE = 4096 = 1 0000 0000 0000 (2^12)
   // PGSIZE-1 = 0 1111 1111 1111 
-  // ~(PGSIZE-1) = 1111 ....1 0000 0000 0000
   // for page alligned address last 12 bits should be 0 
   if (((uint)addr & (PGSIZE-1)) != 0)
   {
@@ -519,12 +471,65 @@ int munprotect(void *addr, int len)
       }
       a += PGSIZE;
     }
+    // It will trigger cr3 register update
     lcr3(V2P(p->pgdir));
     return 0;
   }
   return -1;
 }
 
+int mtestprotect(void* addr, int len)
+{
+  struct proc *p;
+  uint i;
+  int ret;
+  pte_t *pte;
+  char* a ;
+  pte_t *pgdir;
+
+  p = myproc();
+  // check if Address is paged alligned
+  // PGSIZE = 4096 = 1 0000 0000 0000 (2^12)
+  // PGSIZE-1 = 0 1111 1111 1111 
+  // for page alligned address last 12 bits should be 0 
+  if (((uint)addr & (PGSIZE-1)) != 0)
+  {
+    return -1;
+  }
+
+  if (len <= 0)
+    return -1;
+
+  if (p && p->pgdir)
+  {
+    pgdir = p->pgdir;
+    ret = 0;
+    pte = 0;
+    a = (char*) PGROUNDDOWN((uint)addr);
+    for (i = 0; i < len; i++)
+    {
+      pte = walkpgdir(pgdir, a, 0);
+      if (pte != 0 && (*pte & PTE_P))
+      {
+        if (*pte & PTE_W) 
+        {
+          ret = ret+1;
+          //filewrite(p->ofile[1], "check", 6);
+        }
+      } 
+      else 
+      {
+        return -1;
+      }
+      a += PGSIZE;
+    }
+    // This will trigger the cr3 register update
+    lcr3(V2P(p->pgdir));
+    return ret;
+  }
+  return -1;
+
+}
 //PAGEBREAK!
 // Blank page.
 //PAGEBREAK!

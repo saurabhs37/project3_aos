@@ -9,6 +9,7 @@
 
 extern int  mprotect(void*, int);
 extern int munprotect(void*, int);
+extern int mtestprotect(void*, int);
 
 int
 sys_fork(void)
@@ -115,4 +116,16 @@ int sys_munprotect(void)
   if(argint(1, &len) < 0)
     return -1;
   return munprotect((void*)addr, len);
+}
+
+int sys_mtestprotect(void)
+{
+  char* addr = 0;
+  int len = 0;
+  if (argptr(0, &addr, sizeof(char*)) < 0)
+    return -1;
+
+  if(argint(1, &len) < 0)
+    return -1;
+  return mtestprotect((void*)addr, len);
 }
