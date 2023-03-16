@@ -39,7 +39,6 @@ exec(char *path, char **argv)
     goto bad;
 
   // Load program into memory.
-  //sz = 0;
   // saurabh, Allocating first page from 0x1000 = 4096 , 4K Memory
   sz = 0x1000;
   for(i=0, off=elf.phoff; i<elf.phnum; i++, off+=sizeof(ph)){
