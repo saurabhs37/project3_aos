@@ -18,6 +18,8 @@ int nextpid = 1;
 extern void forkret(void);
 extern void trapret(void);
 
+int lastMemAllocSz = 0;
+
 static void wakeup1(void *chan);
 
 void
@@ -162,6 +164,7 @@ growproc(int n)
   uint sz;
   struct proc *curproc = myproc();
 
+  lastMemAllocSz = n;  
   sz = curproc->sz;
   if(n > 0){
     if((sz = allocuvm(curproc->pgdir, sz, sz + n)) == 0)
@@ -173,10 +176,11 @@ growproc(int n)
   curproc->sz = sz;
 
   // Check if this is child thread and we need to update sz of parent thread
-  acquire(&ptable.lock);
   if (curproc->isChildThread == 1) 
   {
+    acquire(&ptable.lock);
     curproc->parent->sz = sz;
+    release(&ptable.lock);
   }
   /*else 
   {
@@ -189,7 +193,6 @@ growproc(int n)
       }
     }
   }*/
-  release(&ptable.lock);
   switchuvm(curproc);
   return 0;
 }
@@ -255,9 +258,15 @@ int clone(void (*fnc)(void*, void*), void* arg1, void* arg2, void* stack)
     return -1;
   }
 
-  if (stack == 0) 
+  if (stack == 0 || fnc == 0) 
     return -1;
-  
+
+  // PGSIZE = 4096 = 1 0000 0000 0000 
+  // PGSIZE-1 = 0 1111 1111 1111 
+  //if (lastMemAllocSz < USR_STACK_SIZE || ((uint)stack & (PGSIZE -1)) != 0) // ensure stack is page alligned 
+  if (lastMemAllocSz < USR_STACK_SIZE) // ensure stack is page alligned 
+    return -1;
+
   usrStack[stackEndIndex-1] = (uint)arg2;
   usrStack[stackEndIndex-2] = (uint)arg1;
   usrStack[stackEndIndex-3] = 0xFFFFFFFF;
