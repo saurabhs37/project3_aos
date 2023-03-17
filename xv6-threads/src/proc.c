@@ -163,6 +163,7 @@ growproc(int n)
 {
   uint sz;
   struct proc *curproc = myproc();
+  struct proc *parent, *p;
 
   lastMemAllocSz = n;  
   sz = curproc->sz;
@@ -175,24 +176,23 @@ growproc(int n)
   }
   curproc->sz = sz;
 
+  parent = curproc;
   // Check if this is child thread and we need to update sz of parent thread
+  acquire(&ptable.lock);
   if (curproc->isChildThread == 1) 
   {
-    acquire(&ptable.lock);
     curproc->parent->sz = sz;
-    release(&ptable.lock);
+    parent = curproc->parent;
   }
-  /*else 
+  // need to update sz for child thread?  Not clear in specifications
+  for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
   {
-    // need to update sz for child thread?  Not clear in specifications
-    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+    if (p->parent == parent && (p->state != ZOMBIE || p->state != UNUSED))
     {
-      if (p->parent == curproc && (p->state != ZOMBIE || p->state != UNUSED)) 
-      {
-        p->sz = parent->sz;
-      }
+      p->sz = parent->sz;
     }
-  }*/
+  }
+  release(&ptable.lock);
   switchuvm(curproc);
   return 0;
 }
@@ -251,7 +251,9 @@ int clone(void (*fnc)(void*, void*), void* arg1, void* arg2, void* stack)
   struct proc *curproc = myproc();
   int* usrStack = (int*) stack;
   char* ustack = (char*)stack;
-  int stackEndIndex = USR_STACK_SIZE / sizeof(int);
+  int stackEndIndex = USR_MIN_STACK_SIZE / sizeof(int);
+  int psz = curproc->sz;
+  int diff = psz - (uint)stack;
 
   // Allocate process.
   if((np = allocproc()) == 0){
@@ -261,16 +263,13 @@ int clone(void (*fnc)(void*, void*), void* arg1, void* arg2, void* stack)
   if (stack == 0 || fnc == 0) 
     return -1;
 
-  // PGSIZE = 4096 = 1 0000 0000 0000 
-  // PGSIZE-1 = 0 1111 1111 1111 
-  //if (lastMemAllocSz < USR_STACK_SIZE || ((uint)stack & (PGSIZE -1)) != 0) // ensure stack is page alligned 
-  if (lastMemAllocSz < USR_STACK_SIZE) // ensure stack is page alligned 
+  if (diff < USR_MIN_STACK_SIZE) // Check if we have sufficient stack
     return -1;
 
   usrStack[stackEndIndex-1] = (uint)arg2;
   usrStack[stackEndIndex-2] = (uint)arg1;
   usrStack[stackEndIndex-3] = 0xFFFFFFFF;
-  ustack = ustack + (USR_STACK_SIZE - 3 * sizeof(int));
+  ustack = ustack + (USR_MIN_STACK_SIZE - 3 * sizeof(int));
 
   np->pgdir = curproc->pgdir; // share same pgdir
   np->sz = curproc->sz;

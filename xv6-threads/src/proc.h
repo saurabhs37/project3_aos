@@ -58,4 +58,4 @@ struct proc {
 //   original data and bss
 //   fixed-size stack
 //   expandable heap
-#define USR_STACK_SIZE 4096
+#define USR_MIN_STACK_SIZE 4096
