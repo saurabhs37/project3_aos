@@ -25,7 +25,6 @@ int sleep(int);
 int uptime(void);
 int mprotect(void*, int);
 int munprotect(void*, int);
-int mtestprotect(void*, int); // testing function call
 
 // ulib.c
 int stat(const char*, struct stat*);

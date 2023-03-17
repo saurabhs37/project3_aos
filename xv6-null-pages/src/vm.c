@@ -478,58 +478,6 @@ int munprotect(void *addr, int len)
   return -1;
 }
 
-int mtestprotect(void* addr, int len)
-{
-  struct proc *p;
-  uint i;
-  int ret;
-  pte_t *pte;
-  char* a ;
-  pte_t *pgdir;
-
-  p = myproc();
-  // check if Address is paged alligned
-  // PGSIZE = 4096 = 1 0000 0000 0000 (2^12)
-  // PGSIZE-1 = 0 1111 1111 1111 
-  // for page alligned address last 12 bits should be 0 
-  if (((uint)addr & (PGSIZE-1)) != 0)
-  {
-    return -1;
-  }
-
-  if (len <= 0)
-    return -1;
-
-  if (p && p->pgdir)
-  {
-    pgdir = p->pgdir;
-    ret = 0;
-    pte = 0;
-    a = (char*) PGROUNDDOWN((uint)addr);
-    for (i = 0; i < len; i++)
-    {
-      pte = walkpgdir(pgdir, a, 0);
-      if (pte != 0 && (*pte & PTE_P))
-      {
-        if (*pte & PTE_W) 
-        {
-          ret = ret+1;
-          //filewrite(p->ofile[1], "check", 6);
-        }
-      } 
-      else 
-      {
-        return -1;
-      }
-      a += PGSIZE;
-    }
-    // This will trigger the cr3 register update
-    lcr3(V2P(p->pgdir));
-    return ret;
-  }
-  return -1;
-
-}
 //PAGEBREAK!
 // Blank page.
 //PAGEBREAK!
