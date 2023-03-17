@@ -418,7 +418,6 @@ int mprotect(void *addr, int len)
       if (pte != 0 && (*pte & PTE_P))
       {
         (*pte) = (*pte) & (~PTE_W);
-        //filewrite(p->ofile[1], "check\n", 6);
       } 
       else 
       {
