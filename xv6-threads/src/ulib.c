@@ -107,7 +107,6 @@ memmove(void *vdst, const void *vsrc, int n)
 
 int thread_create(void (*start_routine)(void *, void *), void *arg1, void *arg2)
 {
-  //void *stack = sbrk(4096);
   void *stack = malloc(4096);
   if (stack) {
     memset(stack, 0, 4096);
@@ -124,7 +123,6 @@ int thread_join()
   if (pid != -1 && stack != 0)
   {
     free(stack);
-    //sbrk(-4096);
   }
   return pid;
 }

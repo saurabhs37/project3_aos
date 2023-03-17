@@ -18,8 +18,6 @@ int nextpid = 1;
 extern void forkret(void);
 extern void trapret(void);
 
-int lastMemAllocSz = 0;
-
 static void wakeup1(void *chan);
 
 void
@@ -165,7 +163,6 @@ growproc(int n)
   struct proc *curproc = myproc();
   struct proc *parent, *p;
 
-  lastMemAllocSz = n;  
   sz = curproc->sz;
   if(n > 0){
     if((sz = allocuvm(curproc->pgdir, sz, sz + n)) == 0)
@@ -184,7 +181,7 @@ growproc(int n)
     curproc->parent->sz = sz;
     parent = curproc->parent;
   }
-  // need to update sz for child thread?  Not clear in specifications
+  // need to update sz for child threads
   for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
   {
     if (p->parent == parent && (p->state != ZOMBIE || p->state != UNUSED))
